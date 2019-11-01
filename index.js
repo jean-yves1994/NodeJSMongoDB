@@ -1,8 +1,10 @@
 var mongodb = require('mongodb');
 var ObjectID = mongodb.ObjectID;
+
 var crypto = require('crypto');
 var express = require('express');
 var bodyParser = require('body-parser');
+
 
 //PASSWORD UTILS
 //CREATE FUNCTION TO RANDOM SALT
@@ -43,7 +45,9 @@ app.use(bodyParser.urlencoded({extended: true}));
 var MongoClient = mongodb.MongoClient;
 
 //Coonection URL
-var url = 'mongodb://localhost:27017' //Defaul port 
+//var url = 'mongodb://localhost:27017' //Defaul port 
+var url = 'mongodb+srv://kingbeats:root@mynodejsapi-htzwm.mongodb.net/test?retryWrites=true&w=majority';
+
 
 MongoClient.connect(url,{useNewUrlParser: true},function(err,client){
     if(err)
@@ -69,7 +73,8 @@ MongoClient.connect(url,{useNewUrlParser: true},function(err,client){
                 'password':password,
                 'salt':salt,
                 'phone': phone,
-                'name': name
+                'name': name,
+                'isMobileLoggedIn':false
             };
             var db = client.db('secureid');
 
@@ -96,6 +101,7 @@ MongoClient.connect(url,{useNewUrlParser: true},function(err,client){
             
             var email = post_data.email;
             var userPassword = post_data.password;
+            var device = post_data.device;
 
             var db = client.db('secureid');
 
@@ -115,8 +121,20 @@ MongoClient.connect(url,{useNewUrlParser: true},function(err,client){
                         var encrypted_password = user.password;
                         if(hashed_password ==encrypted_password)
                         {
-                            response.json('Login success');
+							//Check if user is Mobile logged in
+                            response.json(email);
                             console.log('Login success');
+                            if(device === "Mobile"){
+                                user.isMobileLoggedIn = true;
+                                db.collection('user').update({email:email},user,function(err,updatedUser){
+                                    if(err){
+                                        console.log(err);
+                                    }else{
+                                        console.log("success");
+            
+                                    }
+                                })
+                            }
                         }
                         else{
                             response.json('Wrong password');
@@ -126,6 +144,30 @@ MongoClient.connect(url,{useNewUrlParser: true},function(err,client){
                 }
             })
         });
+
+        app.get('/logout',function(req,res){
+            var email = req.body.email;
+            var device = req.body.device;
+            var db = client.db('secureid');
+
+            db.collection('user').findOne({email:email},function(err,user){
+                if(err){
+                    console.log(err);
+                }else{
+                    if(device === "Mobile"){
+                        user.isMobileLoggedIn = false;
+                        db.collection('user').update({email:email},user,function(err,updatedUser){
+                            if(err){
+                                console.log(err);
+                            }else{
+                                console.log("success");
+                                res.json("You are logged out");
+                            }
+                        })
+                    }
+                }
+            })
+        })
         //Start web server
         app.listen(3000,()=>{
             console.log('Connected to MongoDB server, WebService running on port 3000');
